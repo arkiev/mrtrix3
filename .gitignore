@@ -35,6 +35,7 @@ build.*
 /compiled_docs/
 /.vscode/
 .cproject
+.DS_store
 .idea
 .project
 .settings
