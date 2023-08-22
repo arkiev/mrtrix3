@@ -944,7 +944,7 @@ namespace MR
       if (name_string.length() > 3) {
         std::string prefix = name_string.substr(0, 3);
         if (!prefix.compare("5tt")) {
-          name_string = "fivetissuetype" + name_string.substr(3, name_string.length());
+          name_string = "fivett" + name_string.substr(3, name_string.length());
         }
       }
 
@@ -963,18 +963,22 @@ namespace MR
       std::string s = std::string("import typing as ty \n");
       s += "from pathlib import Path  # noqa: F401\n";
       s += "from fileformats.generic import File, Directory  # noqa: F401\n";
-      s += "from fileformats.medimage import MrtrixTrack  # noqa: F401\n";
+      s += "from fileformats.mrtrix3 import ImageIn, ImageOut, Tracks  # noqa: F401\n";
       s += "from pydra import ShellCommandTask \n";
       s += "from pydra.engine import specs\n";
-      s += "from pydra.tasks.mrtrix3.fileformats import ImageIn, ImageOut  # noqa: F401\n";
 
       auto escape_id = [&](const std::string& id) {
         std::string escaped = id;
+        // Replace any spaces and periods with underscores
+        std::replace(escaped.begin(), escaped.end(), ' ', '_');
+        std::replace(escaped.begin(), escaped.end(), '.', '_');
+        // Append any Python keywords with an underscore
         bool is_keyword = std::any_of(std::begin(PYTHON_KEYWORDS), std::end(PYTHON_KEYWORDS), [&id](const std::string& kword) {
           return kword == id;
         });
         if (is_keyword)
           escaped += "_";
+        
         return escaped;
       };
 
@@ -1018,9 +1022,9 @@ namespace MR
           case FloatSeq:
             return "ty.List[float]";
           case TracksIn:
-            return "MrtrixTrack";
+            return "Tracks";
           case TracksOut:
-            return "MrtrixTrack";
+            return "Tracks";
           case Various:
             return "ty.Any";
           default:
