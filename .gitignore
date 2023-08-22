@@ -60,4 +60,5 @@ testing/src/project_version.h
 *.venv
 __pycache__
 .DS_Store
-/pydra/pydra/tasks/mrtrix3/_version.py
+/pydra/src/pydra/tasks/mrtrix3/_version.py
+/pydra/src/pydra/tasks/mrtrix3/latest
