@@ -947,6 +947,7 @@ namespace MR
       // Add import lines
       std::string s = std::string("import typing as ty \n");
       s += "from pydra import ShellCommandTask \n";
+      s += "from pydra.engine import specs\n";
       s += "from fileformats.generic import File, Directory  # noqa\n";
       s += "from fileformats.medimage import MrtrixTrack  # noqa\n";
       s += "from pydra.tasks.mrtrix3.fileformats import ImageInput, ImageOutput  # noqa\n";
@@ -1049,7 +1050,7 @@ namespace MR
       s += "\n\ninput_fields = [\n\n" + base_indent + "# Arguments\n";
       for (size_t i = 0; i < ARGUMENTS.size(); ++i) {
 
-        std::string f = base_indent + "(\n";
+        s += base_indent + "(\n";
         // Print name of field
         s += indent + "\"" + ARGUMENTS[i].id + "\",\n";
         // Print type
@@ -1107,10 +1108,10 @@ namespace MR
 
       s += "]\n\n";
 
-      s += name_string + "_input_spec = specs.SpecInfo(name='Input', fields=input_fields, bases=(specs.ShellSpec,))\n\n";
+      s += name_string + "_input_spec = specs.SpecInfo(name='Input', fields=input_fields, bases=(specs.ShellSpec,))\n\n\n";
 
-      s += "output_fields = "; // {output_fields_str}\n"
-      s += name_string + "_output_spec = specs.SpecInfo(name='Output', fields=output_fields, bases=(specs.ShellOutSpec,))\n\n";
+      s += "output_fields = []"; // {output_fields_str}\n"
+      s += name_string + "_output_spec = specs.SpecInfo(name='Output', fields=output_fields, bases=(specs.ShellOutSpec,))\n\n\n";
 
       // Create actual class
       s += "class " + name_string + "(ShellCommandTask):\n";
@@ -1143,9 +1144,9 @@ namespace MR
         + "\n\n" + indent + "Author: " + AUTHOR
         + "\n\n" + indent + "Copyright: " + COPYRIGHT;
       s += "    \"\"\"\n";
-      s += "    executable=\"" + name_string + "\"\n";
+      s += "    executable = \"" + name_string + "\"\n";
       s += "    input_spec = " + name_string + "_input_spec\n";
-      s += "    output_spec = " + name_string + "_output_spec\n";
+      s += "    output_spec = " + name_string + "_output_spec\n\n";
 
       return s;
     }
