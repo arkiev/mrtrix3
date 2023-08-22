@@ -1029,13 +1029,12 @@ namespace MR
         return f;
       };
       
-      auto format_limits = [&](const Argument& arg) {
+      auto format_choices = [&](const Argument& arg) {
         std::string f = md_indent + "\"allowed_values\": [";
-        for (size_t c = 0; c < sizeof(arg.limits.choices); c++) {
-          f += std::string("\"") + arg.limits.choices[c] + "\"";
-          if (c < (sizeof(arg.limits.choices) - 1)) {
-            f += ", ";
-          }
+        const char* const* choices = arg.limits.choices;
+        f += std::string("\"") + choices[0] + "\"";
+        for (int i = 0; choices[i]; ++i) {
+          f += std::string(", \"") + choices[i] + "\"";
         }
         f += "],\n";
         return f;
@@ -1056,8 +1055,8 @@ namespace MR
         if (opt.size() == 1 && (opt[0].type == IntSeq || opt[0].type == FloatSeq)) {
           f += md_indent + "\"sep\": \",\",\n";
         }
-        if (opt.size() == 1 and opt[0].limits.choices) {
-          f += format_limits(opt[0]);
+        if (opt.size() == 1 && opt[0].type == Choice) {
+          f += format_choices(opt[0]);
         }
         f += indent + "},\n" + base_indent + "),\n";
         return f;
@@ -1076,8 +1075,6 @@ namespace MR
         // is something else.
         return tmpl;
       };
-
-      printf("HERE 1080\n");
 
       // Print out input spec
       s += "\n\ninput_fields = [\n\n" + base_indent + "# Arguments\n";
@@ -1112,8 +1109,8 @@ namespace MR
         if (!(ARGUMENTS[i].flags & Optional) && !output_type) {
           s += md_indent + "\"mandatory\": True,\n";
         }
-        if (ARGUMENTS[i].limits.choices) {
-          s += format_limits(ARGUMENTS[i]);
+        if (ARGUMENTS[i].type == Choice) {
+          s += format_choices(ARGUMENTS[i]);
         }
         s += indent + "},\n" + base_indent + "),\n";
       }
@@ -1123,7 +1120,7 @@ namespace MR
         if (std::find (group_names.begin(), group_names.end(), OPTIONS[i].name) == group_names.end())
           group_names.push_back (OPTIONS[i].name);
       }
-
+      std::cout << "HERE 1125\n";
       for (size_t i = 0; i < group_names.size(); ++i) {
         size_t n = i;
         while (OPTIONS[n].name != group_names[i])
@@ -1131,9 +1128,12 @@ namespace MR
         if (OPTIONS[n].name != std::string("OPTIONS"))
           s += std::string("\n") + base_indent + "# " + OPTIONS[n].name + " Option Group\n";
         while (n < OPTIONS.size()) {
+          std::cout << "Options size: " << OPTIONS[n].size() << "\n";
           if (OPTIONS[n].name == group_names[i]) {
-            for (size_t o = 0; o < OPTIONS[n].size(); ++o)
+            for (size_t o = 0; o < OPTIONS[n].size(); ++o) {
+              std::cout << "o : " << o << "\n";
               s += format_option (OPTIONS[n][o]);
+            }
           }
           ++n;
         }
