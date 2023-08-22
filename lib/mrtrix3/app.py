@@ -15,6 +15,7 @@
 
 import argparse, inspect, math, os, random, shlex, shutil, signal, string, subprocess, sys, textwrap, time, re
 import typing as ty
+from keyword import kwlist as PYTHON_KEYWORDS
 try:
   import black.parsing
 except ImportError:
@@ -23,7 +24,7 @@ else:
   HAVE_BLACK = True
 from mrtrix3 import ANSI, CONFIG, MRtrixError, setup_ansi
 from mrtrix3 import utils # Needed at global level
-from keyword import kwlist as PYTHON_KEYWORDS
+
 from ._version import __version__
 
 
@@ -1360,5 +1361,3 @@ def handler(signum, _frame):
     else:
       sys.stderr.write(EXEC_NAME + ': ' + ANSI.console + 'Scratch directory retained; location: ' + SCRATCH_DIR + ANSI.clear + '\n')
   os._exit(signum) # pylint: disable=protected-access
-
-
