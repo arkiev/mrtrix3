@@ -1105,7 +1105,7 @@ class Parser(argparse.ArgumentParser):
         "help_string": arg.help,
       }
       if arg.choices:
-        metadata["allowed_values"] = arg.choices
+        metadata["allowed_values"] = list(arg.choices)
       if arg.required:
         metadata["mandatory"] = True
       return metadata
