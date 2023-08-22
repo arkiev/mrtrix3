@@ -17,6 +17,7 @@
 *.hdr
 *.qrc
 *.rste
+*.venv
 config
 build.*
 /configure.log
