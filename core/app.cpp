@@ -1001,6 +1001,7 @@ namespace MR
           default:
             assert(0);
         }
+        return "not-reached";
       };
 
       auto format_option_type = [&](const Option& opt, bool for_output = false) {
