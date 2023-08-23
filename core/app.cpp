@@ -1106,10 +1106,10 @@ namespace MR
             || opt[0].type == ArgDirectoryOut
           )
         ) {
+          is_output_file = true;
           bool is_multi = type_string.length() > 19 && type_string.substr(0, 19) == "specs.MultiInputObj";
-          if (!is_multi) {
+          if (!is_multi)
             type_string = "ty.Union[" + type_string + ", bool]";
-          }
         }
         // Print type
         f += indent + type_string + ",\n";
