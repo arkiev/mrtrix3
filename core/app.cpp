@@ -1226,6 +1226,10 @@ void parse_special_options() {
     print(restructured_text_usage());
     throw 0;
   }
+  if (strcmp(argv[1], "__print_usage_pydra__") == 0) {
+    print(pydra_usage());
+    throw 0;
+  }
   if (strcmp(argv[1], "__print_synopsis__") == 0) {
     print(SYNOPSIS);
     throw 0;
