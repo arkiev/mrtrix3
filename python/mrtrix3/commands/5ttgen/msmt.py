@@ -13,7 +13,7 @@
 #
 # For more details, see http://www.mrtrix.org/.
 
-import glob, os
+import glob, os, shutil
 from mrtrix3 import MRtrixError
 from mrtrix3 import app, image, path, run
 
@@ -165,6 +165,16 @@ def execute(): # pylint: disable=unused-variable
       except MRtrixError:
         app.warn('FSL fast not found; intensity-guided tissue segmentation will be skipped')
 
+    have_acpcdetect = bool(shutil.which('acpcdetect')) and 'ARTHOME' in os.environ
+    if have_acpcdetect:
+      if have_fast:
+        app.console('ACPCdetect and FSL FAST will be used for explicit WM segmentation of anterior/posterior commissures')
+      else:
+        app.warn('ACPCdetect is installed, but FSL FAST not found; cannot segment anterior/posterior commissures')
+        have_acpcdetect = False
+    else:
+      app.warn('ACPCdetect not installed; anterior/posterior commissures will not receive targeted FAST segmentation')
+
     # --- FIRST: sub-cortical GM segmentation ---
     SGM_FIRST_MAP = {
       'L_Accu': 'Left-Accumbens-area',  'R_Accu': 'Right-Accumbens-area',
@@ -206,33 +216,61 @@ def execute(): # pylint: disable=unused-variable
     else:
       sgm_volume = empty_volume
 
-    # --- FAST: intensity-guided tissue segmentation using vis image ---
-    # vis.nii (derived from 5TT_masked via 5tt2vis) has WM bright, CSF dark,
-    #   giving FAST three classes: pve_0=CSF, pve_1=GM, pve_2=WM
-    if have_fast:
-      app.console('Running FSL FAST on vis image for intensity-guided tissue segmentation')
-      run.command('mrcalc vis.nii brain_mask_derived.mif -mult vis_brain.nii')
-      run.command(fast_cmd + ' -N vis_brain.nii')
-      app.cleanup('vis_brain.nii')
-      app.cleanup([e for e in glob.glob('vis_brain*') if '_pve_' not in e])
+    # ODF-derived fractions as base for CGM, WM, CSF
+    run.command('mrconvert ' + result_masked + ' -coord 3 0 -axes 0,1,2 cgm_masked.mif')
+    run.command('mrconvert ' + result_masked + ' -coord 3 2 -axes 0,1,2 wm_masked.mif')
+    run.command('mrconvert ' + result_masked + ' -coord 3 3 -axes 0,1,2 csf_masked.mif')
+    cgm_vol = 'cgm_masked.mif'
+    wm_vol  = 'wm_masked.mif'
+    csf_vol = 'csf_masked.mif'
 
-      fast_pve_prefix = 'vis_brain_pve_'
-      run.command('mrconvert ' + fsl.find_image(fast_pve_prefix + '1') + ' fast_cgm.mif')
-      run.command('mrconvert ' + fsl.find_image(fast_pve_prefix + '2') + ' fast_wm.mif')
-      run.command('mrconvert ' + fsl.find_image(fast_pve_prefix + '0') + ' fast_csf.mif')
-      app.cleanup(glob.glob(fast_pve_prefix + '*'))
-
-      cgm_vol = 'fast_cgm.mif'
-      wm_vol  = 'fast_wm.mif'
-      csf_vol = 'fast_csf.mif'
-    else:
-      # Fall back to ODF-derived fractions from the initial masked 5TT
-      run.command('mrconvert ' + result_masked + ' -coord 3 0 -axes 0,1,2 cgm_masked.mif')
-      run.command('mrconvert ' + result_masked + ' -coord 3 2 -axes 0,1,2 wm_masked.mif')
-      run.command('mrconvert ' + result_masked + ' -coord 3 3 -axes 0,1,2 csf_masked.mif')
-      cgm_vol = 'cgm_masked.mif'
-      wm_vol  = 'wm_masked.mif'
-      csf_vol = 'csf_masked.mif'
+    # --- ACPC FAST: intensity-guided WM segmentation at anterior/posterior commissures ---
+    if have_acpcdetect:
+      app.console('Using ACPCdetect and FSL FAST to segment anterior/posterior commissures')
+      acpcdetect_input = 'vis_RAS_16b.nii'
+      run.command(['mrconvert', 'vis.nii', '-datatype', 'uint16', '-stride', '+1,+2,+3', acpcdetect_input])
+      run.command(['acpcdetect', '-i', acpcdetect_input])
+      acpcdetect_input_header = image.Header(acpcdetect_input)
+      acpcdetect_output = os.path.splitext(acpcdetect_input)[0] + '_ACPC.txt'
+      app.cleanup(acpcdetect_input)
+      with open(acpcdetect_output, 'r', encoding='utf-8') as acpc_file:
+        acpcdetect_data = acpc_file.read().splitlines()
+      app.cleanup(glob.glob(os.path.splitext(acpcdetect_input)[0] + '*'))
+      ac_voxel = pc_voxel = None
+      for idx, line in enumerate(acpcdetect_data):
+        if 'AC' in line and 'voxel location' in line:
+          ac_voxel = [float(x) for x in acpcdetect_data[idx + 1].strip().split()]
+        elif 'PC' in line and 'voxel location' in line:
+          pc_voxel = [float(x) for x in acpcdetect_data[idx + 1].strip().split()]
+      if not ac_voxel:
+        app.warn('Could not parse AC location from acpcdetect output; skipping ACPC FAST')
+      else:
+        def voxel2scanner(voxel, header):
+          return [voxel[0] * header.spacing()[0] * header.transform()[axis][0]
+                  + voxel[1] * header.spacing()[1] * header.transform()[axis][1]
+                  + voxel[2] * header.spacing()[2] * header.transform()[axis][2]
+                  + header.transform()[axis][3]
+                  for axis in range(0, 3)]
+        ac_scanner = voxel2scanner(ac_voxel, acpcdetect_input_header)
+        acpc_mask = 'ACPC_FAST_mask.mif'
+        mredit_cmd = ['mrcalc', empty_volume, 'nan', '-eq', '-', '|',
+                      'mredit', '-', acpc_mask, '-scanner',
+                      '-sphere', ','.join(map(str, ac_scanner)), '8', '1']
+        if pc_voxel:
+          pc_scanner = voxel2scanner(pc_voxel, acpcdetect_input_header)
+          mredit_cmd.extend(['-sphere', ','.join(map(str, pc_scanner)), '5', '1'])
+        run.command(mredit_cmd)
+        acpc_vis = 'ACPC_vis.nii'
+        run.command(['mrcalc', 'vis.nii', acpc_mask, '-mult', acpc_vis])
+        run.command([fast_cmd, '-N', acpc_vis])
+        app.cleanup(acpc_vis)
+        fast_pve_prefix = os.path.splitext(acpc_vis)[0] + '_pve_'
+        acpc_fast_wm = 'acpc_fast_wm.mif'
+        run.command(['mrconvert', fsl.find_image(fast_pve_prefix + '2'), acpc_fast_wm])
+        app.cleanup(glob.glob(fast_pve_prefix + '*'))
+        run.command(f'mrcalc {acpc_mask} {acpc_fast_wm} {wm_vol} -if wm_with_acpc.mif')
+        app.cleanup([acpc_mask, acpc_fast_wm])
+        wm_vol = 'wm_with_acpc.mif'
 
     app.cleanup('vis.nii')
 
